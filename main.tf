@@ -9,7 +9,7 @@ terraform {
 }
 
 provider "aws" {
-  # AWS credentials are stored securily in a direcotory
+  # AWS credentials are stored securely in the ~/.aws/credentials file.
   region = "us-east-1"
 
   
@@ -29,6 +29,20 @@ resource "aws_vpc" "kubeadm_project_vpc"{
 }
 
 # 2. Subnet
+
+resource "aws_subnet" "kubeadm_project_subnet" {
+
+	vpc_id = aws_vpc.kubeadm_project_vpc.id
+	cidr_block = "10.0.1.0/24"
+	map_public_ip_on_launch = true
+
+	tags = {
+	
+	   Name = "kubeadm_project_subnet"
+	}
+
+}
+
 # 3. Internet gateway
 # 4. Custom route table
 # 5. Associate the route table to the subnet
