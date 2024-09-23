@@ -5,6 +5,13 @@ terraform {
       source = "hashicorp/aws"
       version = "5.68.0"
     }
+
+    tls = {
+      source = "hashicorp/tls"
+      version = "4.0.6"
+    }
+    
+
   }
 }
 
@@ -221,7 +228,7 @@ resource "aws_security_group" "kubeadm_project_sg_worker_nodes" {
 }
 
 // 4. flannel UDP backend ports
-resource "aws_security_group" "kubeadm_project_sg_worker_flannel" {
+resource "aws_security_group" "kubeadm_project_sg_flannel" {
 
         name = "kubeadm_project_sg_flannel"
 
@@ -247,4 +254,83 @@ resource "aws_security_group" "kubeadm_project_sg_worker_flannel" {
 
         }
 
+}
+
+# Note instance related resources
+
+resource "tls_private_key" "kubeadm_project_private_key" {
+	algorithm = "RSA"
+	rsa_bits  = 4096
+
+        provisioner "local-exec" {
+        
+                command = "echo '${self.public_key_pem}' > ./pubkey.pem"
+	
+	}
+}
+
+resource "aws_key_pair" "kubeadm_project_key" {
+
+        key_name = var.kubeadm_project_key_name
+	public_key = tls_private_key.kubeadm_project_private_key.public_key_openssh
+	
+        provisioner "local-exec" {
+        
+        command = "echo '${tls_private_key.kubeadm_project_private_key.private_key_pem}' > ./private-key.pem"
+	
+	}
+}
+
+resource "aws_instance" "kubeadm_project_control_plane" {
+	ami           = var.kubeadm_project_ami
+  	instance_type = "t2.micro"
+	key_name = aws_key_pair.kubeadm_project_key.key_name
+	associate_public_ip_address = true
+
+	security_groups = [
+
+		aws_security_group.kubeadm_project_sg_common.name,
+		aws_security_group.kubeadm_project_sg_control_plane.name,
+		aws_security_group.kubeadm_project_sg_flannel.name,
+	]	
+
+	tags = {
+    	   
+	   Name = "kubeadm_project_control_plane"
+  	   Role = "Control Plane"
+	}
+
+	provisioner "local-exec" {
+	
+		command = "echo 'master ${self.public_ip}' >> ./files/hosts"
+
+	}
+}
+
+resource "aws_instance" "kubeadm_demo_worker_nodes" {
+
+	count = var.kubeadm_project_instance_count
+        ami           = var.kubeadm_project_ami
+        instance_type = "t2.micro"
+        key_name = aws_key_pair.kubeadm_project_key.key_name
+        associate_public_ip_address = true
+
+        security_groups = [
+
+                aws_security_group.kubeadm_project_sg_common.name,
+                aws_security_group.kubeadm_project_sg_worker_nodes.name,
+                aws_security_group.kubeadm_project_sg_flannel.name,
+        ]       
+
+        tags = {
+        
+           Name = "kubeadm_project_Worker-${count.index}"
+	   Role = "Worker Node"
+        }
+
+        provisioner "local-exec" {
+
+                command = "echo 'wokrer-${count.index} ${self.public_ip}' >> ./files/hosts"
+
+        }
 }
