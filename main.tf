@@ -311,7 +311,7 @@ resource "aws_instance" "kubeadm_project_control_plane" {
 	}
 }
 
-resource "aws_instance" "kubeadm_demo_worker_nodes" {
+resource "aws_instance" "kubeadm_project_worker_nodes" {
 
 	count = var.kubeadm_project_instance_count
         ami           = var.kubeadm_project_ami
@@ -337,4 +337,33 @@ resource "aws_instance" "kubeadm_demo_worker_nodes" {
                 command = "echo 'wokrer-${count.index} ${self.public_ip}' >> ./files/hosts"
 
         }
+}
+
+resource "ansible_host" "kubadm_project_control_plane_host" {
+  depends_on = [
+    aws_instance.kubeadm_project_control_plane
+  ]
+  name = "control_plane"
+  groups = ["master"]
+  variables = {
+    ansible_user = "ubuntu"
+    ansible_host = aws_instance.kubeadm_project_control_plane.public_ip
+    ansible_ssh_private_key_file = "./private-key.pem"
+    node_hostname = "master"
+  }
+}
+
+resource "ansible_host" "kubadm_project_worker_nodes_host" {
+  depends_on = [
+    aws_instance.kubeadm_project_worker_nodes
+  ]
+  count = 2
+  name = "worker-${count.index}"
+  groups = ["workers"]
+  variables = {
+    node_hostname = "worker-${count.index}"
+    ansible_user = "ubuntu"
+    ansible_host = aws_instance.kubeadm_project_worker_nodes[count.index].public_ip
+    ansible_ssh_private_key_file = "./private-key.pem"
+  }
 }
