@@ -287,7 +287,7 @@ resource "aws_key_pair" "kubeadm_project_key" {
 
 resource "aws_instance" "kubeadm_project_control_plane" {
 	ami           = var.kubeadm_project_ami
-  	instance_type = "t2.micro"
+  	instance_type = "t3.micro"
 	key_name = aws_key_pair.kubeadm_project_key.key_name
 	associate_public_ip_address = true
 
